@@ -468,9 +468,6 @@ export default function Metronome() {
   // ─────────────────────────────────────────────
   const rhythmLabel = getRhythmLabel(activeStars);
 
-    micStatus === "error"     ? "#E74C3C" :
-    micStatus === "listening" ? "#2ECC71" :
-    micStatus === "requesting"? "#F39C12" : "#4ECDC4";
 
   // ─────────────────────────────────────────────
   // Render
