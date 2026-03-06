@@ -62,7 +62,6 @@ export default function Metronome() {
   const micAnalyserRef  = useRef(null);
   const micSourceRef    = useRef(null);
   const micRafRef       = useRef(null);
-  const prevEnergyRef   = useRef(0);
   const onsetTimesRef   = useRef([]);   // timestamps (AudioContext time) of detected beats
   
 
