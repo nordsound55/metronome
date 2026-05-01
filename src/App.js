@@ -70,9 +70,7 @@ export default function Metronome() {
   const micAnalyserRef  = useRef(null);
   const micSourceRef    = useRef(null);
   const micRafRef       = useRef(null);
-  const prevEnergyRef   = useRef(0);
   const onsetTimesRef   = useRef([]);   // timestamps (AudioContext time) of detected beats
-  const micLevelRafRef  = useRef(null);
 
   // ── Refs: stable copies of state ──
   const bpmRef         = useRef(bpm);
@@ -489,7 +487,6 @@ export default function Metronome() {
   // ─────────────────────────────────────────────
   const rhythmLabel = getRhythmLabel(activeStars);
 
-  const micBtnColor =
     micStatus === "error"     ? "#E74C3C" :
     micStatus === "listening" ? "#2ECC71" :
     micStatus === "requesting"? "#F39C12" : "#4ECDC4";
