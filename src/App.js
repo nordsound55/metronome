@@ -487,9 +487,6 @@ export default function Metronome() {
   // ─────────────────────────────────────────────
   const rhythmLabel = getRhythmLabel(activeStars);
 
-    micStatus === "error"     ? "#E74C3C" :
-    micStatus === "listening" ? "#2ECC71" :
-    micStatus === "requesting"? "#F39C12" : "#4ECDC4";
 
   // ─────────────────────────────────────────────
   // Render
@@ -781,7 +778,6 @@ export default function Metronome() {
         })()}
 
         {/* Error state */}
-        {micStatus === "error" && (
           <div style={{ textAlign: "center", maxWidth: 260 }}>
             <span style={{ fontSize: 12, color: "#E74C3C", fontFamily: "monospace", fontWeight: 700 }}>
               マイクへのアクセスが拒否されています
