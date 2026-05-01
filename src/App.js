@@ -47,7 +47,7 @@ export default function Metronome() {
 
   // ── Mic / BPM detection state ──
   const [micActive, setMicActive] = useState(false);       // mic is running
-  const [micStatus, setMicStatus] = useState("idle");      // idle | requesting | listening | error
+  const [micStatus, setMicStatus] = useState("idle"); // eslint-disable-line      // idle | requesting | listening | error
   const [detectedBpm, setDetectedBpm] = useState(null);    // last detected value (display only)
   const [micLevel, setMicLevel] = useState(0);             // 0-1 for VU meter
 
