@@ -51,6 +51,14 @@ export default function Metronome() {
   const [detectedBpm, setDetectedBpm] = useState(null);    // last detected value (display only)
   const [micLevel, setMicLevel] = useState(0);             // 0-1 for VU meter
 
+  // ── Vibration state ──
+  const [vibrationOn, setVibrationOn] = useState(false);   // vibration enabled
+  const [vibrationMode, setVibrationMode] = useState("accent"); // "accent" | "all"
+  const vibrationOnRef  = useRef(false);
+  const vibrationModeRef = useRef("accent");
+  useEffect(() => { vibrationOnRef.current  = vibrationOn;   }, [vibrationOn]);
+  useEffect(() => { vibrationModeRef.current = vibrationMode; }, [vibrationMode]);
+
   // ── Refs: audio engine ──
   const audioCtxRef    = useRef(null);
   const schedulerRef   = useRef(null);
@@ -62,8 +70,9 @@ export default function Metronome() {
   const micAnalyserRef  = useRef(null);
   const micSourceRef    = useRef(null);
   const micRafRef       = useRef(null);
+  const prevEnergyRef   = useRef(0);
   const onsetTimesRef   = useRef([]);   // timestamps (AudioContext time) of detected beats
-  
+  const micLevelRafRef  = useRef(null);
 
   // ── Refs: stable copies of state ──
   const bpmRef         = useRef(bpm);
@@ -152,7 +161,7 @@ export default function Metronome() {
       if (stars[sub]) {
         scheduleClick(ctx, beatTime, sub === 0);
 
-        // Visual flash: fire setTimeout aligned to the audio timestamp
+        // Visual flash + vibration: fire setTimeout aligned to the audio timestamp
         const delayMs = (beatTime - ctx.currentTime) * 1000;
         const s = sub, sd = slotDur;
         setTimeout(() => {
@@ -160,6 +169,11 @@ export default function Metronome() {
           setActiveBeatStar(s);
           setTimeout(() => setActiveBeatStar(cur => cur === s ? -1 : cur),
             Math.min(200, sd * 600 * 12));
+          // Vibration
+          if (vibrationOnRef.current && navigator.vibrate) {
+            const doVib = vibrationModeRef.current === "all" || s === 0;
+            if (doVib) navigator.vibrate(s === 0 ? 80 : 50);
+          }
         }, Math.max(0, delayMs));
       }
 
@@ -172,8 +186,18 @@ export default function Metronome() {
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (audioCtxRef.current.state === "suspended") audioCtxRef.current.resume();
-    return audioCtxRef.current;
+    const ctx = audioCtxRef.current;
+    if (ctx.state === "suspended" || ctx.state === "interrupted") ctx.resume();
+    // iOS silent-mode unlock: play a silent buffer to activate the audio session
+    if (ctx._unlocked !== true) {
+      ctx._unlocked = true;
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+    }
+    return ctx;
   }, []);
 
   const startScheduler = useCallback(() => {
@@ -431,16 +455,14 @@ export default function Metronome() {
     if (isTouch) {
       isTouchActiveRef.current = true;
     } else {
-      // If touch already handled this, skip mouse event
       if (isTouchActiveRef.current) return;
     }
     changeBpm(delta);
-    let speed = 300, step = 0;
+    let speed = 120, step = 0; // start at medium speed
     const tick = () => {
       changeBpm(delta);
       step++;
-      if (step > 15)     speed = 50;
-      else if (step > 5) speed = 120;
+      if (step > 10) speed = 40; // go fast after 10 steps
       longPressRef.current = setTimeout(tick, speed);
     };
     longPressRef.current = setTimeout(tick, speed);
@@ -467,6 +489,10 @@ export default function Metronome() {
   // ─────────────────────────────────────────────
   const rhythmLabel = getRhythmLabel(activeStars);
 
+  const micBtnColor =
+    micStatus === "error"     ? "#E74C3C" :
+    micStatus === "listening" ? "#2ECC71" :
+    micStatus === "requesting"? "#F39C12" : "#4ECDC4";
 
   // ─────────────────────────────────────────────
   // Render
@@ -771,10 +797,69 @@ export default function Metronome() {
         )}
       </div>
 
+      {/* ── Vibration controls ── */}
+      <div style={{ marginTop: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+        {/* Vibration toggle */}
+        <button
+          onClick={() => setVibrationOn(v => !v)}
+          style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "8px 20px", borderRadius: 32,
+            background: vibrationOn
+              ? "linear-gradient(135deg, #a855f7, #7c3aed)"
+              : "rgba(78,205,196,0.12)",
+            border: vibrationOn ? "none" : "1.5px solid rgba(78,205,196,0.35)",
+            cursor: "pointer", color: vibrationOn ? "white" : "#9BB0AE",
+            fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
+            transition: "all 0.2s ease",
+            outline: "none", WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <span style={{ fontSize: 15 }}>📳</span>
+          {vibrationOn ? "バイブ ON" : "バイブ OFF"}
+        </button>
+
+        {/* Vibration mode selector — only shown when vibration is on */}
+        {vibrationOn && (
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              { value: "accent", label: "12時のみ" },
+              { value: "all",    label: "全ビート" },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setVibrationMode(opt.value)}
+                style={{
+                  padding: "5px 14px", borderRadius: 20,
+                  background: vibrationMode === opt.value
+                    ? "linear-gradient(135deg, #a855f7, #7c3aed)"
+                    : "rgba(168,85,247,0.1)",
+                  border: vibrationMode === opt.value
+                    ? "none"
+                    : "1.5px solid rgba(168,85,247,0.3)",
+                  cursor: "pointer",
+                  color: vibrationMode === opt.value ? "white" : "#a855f7",
+                  fontSize: 11, fontWeight: 700,
+                  transition: "all 0.2s ease",
+                  outline: "none", WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ── Hint ── */}
-      <p style={{ marginTop: 20, fontSize: 11, color: "#9BB0AE", letterSpacing: 0.5, textAlign: "center", lineHeight: 1.9 }}>
+      <p style={{ marginTop: 16, fontSize: 11, color: "#9BB0AE", letterSpacing: 0.5, textAlign: "center", lineHeight: 1.9 }}>
         星をタップしてリズムを追加　／　数字タップ → タップテンポ<br />
         <span style={{ color: "#FF6B35", fontWeight: 700 }}>12時</span> は常にオン（アクセント音）
+      </p>
+
+      {/* ── Version ── */}
+      <p style={{ marginTop: 8, marginBottom: 16, fontSize: 10, color: "#C8C8C0", fontFamily: "monospace", letterSpacing: 1 }}>
+        v1.3.0
       </p>
     </div>
   );
